@@ -1,0 +1,53 @@
+# ProjectHub demo stack (DEC-002): shell + 4 remotes behind nginx.
+# Ports 4400-4404 per DEC-001 (4200-4204 occupied on host; 4300-4304 = local dev).
+# Build context is the workspace root: docker compose -f deploy/projecthub/docker-compose.yml up --build
+name: projecthub
+
+services:
+  shell:
+    build:
+      context: ../..
+      dockerfile: deploy/projecthub/shell.Dockerfile
+    ports:
+      - "4400:80"
+    restart: unless-stopped
+
+  mfe-projects:
+    build:
+      context: ../..
+      dockerfile: deploy/projecthub/remote.Dockerfile
+      args:
+        ARG_REPO: mfe-projects
+    ports:
+      - "4401:80"
+    restart: unless-stopped
+
+  mfe-reports:
+    build:
+      context: ../..
+      dockerfile: deploy/projecthub/remote.Dockerfile
+      args:
+        ARG_REPO: mfe-reports
+    ports:
+      - "4402:80"
+    restart: unless-stopped
+
+  mfe-admin:
+    build:
+      context: ../..
+      dockerfile: deploy/projecthub/remote.Dockerfile
+      args:
+        ARG_REPO: mfe-admin
+    ports:
+      - "4403:80"
+    restart: unless-stopped
+
+  mfe-governance:
+    build:
+      context: ../..
+      dockerfile: deploy/projecthub/remote.Dockerfile
+      args:
+        ARG_REPO: mfe-governance
+    ports:
+      - "4404:80"
+    restart: unless-stopped

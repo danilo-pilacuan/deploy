@@ -1,0 +1,6 @@
+{
+  "mfe-projects": "http://localhost:4401/remoteEntry.json",
+  "mfe-reports": "http://localhost:4402/remoteEntry.json",
+  "mfe-admin": "http://localhost:4403/remoteEntry.json",
+  "mfe-governance": "http://localhost:4404/remoteEntry.json"
+}

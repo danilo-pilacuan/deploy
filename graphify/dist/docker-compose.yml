@@ -1,0 +1,117 @@
+# docker compose para los servicios de graphify.
+# Fuente versionada: deploy/graphify/ (el orquestador emite una copia a deploy/graphify/dist/).
+# El kit (my-custom-kit) no provisiona nada: este compose se opera desde el repo hospedador
+# con node tools/build-graphify.mjs (up|down|extract|update|status) o docker compose directo.
+#
+# CONMUTADOR DE IMPLEMENTACION (desde .env o entorno, sin editar este archivo):
+#   GRAPHIFY_IMAGE_SOURCE=build      (default) imagen local graphify-local:0.9.102, construida
+#                                    desde el Dockerfile de esta carpeta (base y version pinneadas).
+#   GRAPHIFY_IMAGE_SOURCE=dockerhub  imagen sinfallas/remote-graphify:latest (sin build propio;
+#                                    base y tags no pinneados, corre como root; el orquestador
+#                                    hace pull y levanta con --no-build).
+# El entrypoint/command de abajo es valido para AMBAS imagenes: la de sinfallas trae un CMD que
+# no corresponde a graphifyy 0.9.102 (invoca el CLI, no el servidor MCP), por eso se fuerza
+# graphify-mcp (script de consola del paquete, presente en ambas imagenes).
+#
+# Servicios:
+#   graphify        servidor MCP streamable-http en :8080 (read-only sobre graph.json)
+#   graphify-build  perfil "build": build completo del grafo con LLM (docker compose --profile build run --rm graphify-build)
+#   graphify-update perfil "update": update incremental sin LLM para codigo (--profile update run --rm graphify-update)
+#   memgraph        grafo persistente opcional en :7687 (Bolt) para mcp-memgraph
+#   mcp-memgraph    servidor MCP de Memgraph en :8000 (read-only) para consultas Cypher
+#
+# Credenciales y endpoint del LLM van en .env de la raiz del repo (ver .env.example):
+#   OPENAI_BASE_URL / OPENAI_MODEL / OPENAI_API_KEY (backend semantico, OpenAI-compatible)
+#   GRAPHIFY_API_KEY (header X-API-Key del MCP de graphify; vacia = sin auth)
+#   GRAPHIFY_WORKSPACE: raiz del repo a montar (default: .., la raiz desde esta carpeta; el
+#   orquestador la fija explicita para que las rutas no dependan de donde viva el compose).
+
+services:
+  graphify:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: ${GRAPHIFY_IMAGE:-graphify-local:0.9.102}
+    pull_policy: missing
+    restart: unless-stopped
+    ports:
+      - "${GRAPHIFY_PORT:-8080}:8080"
+    environment:
+      # API key del MCP (header X-API-Key). Vacio = sin auth (solo para pruebas locales).
+      GRAPHIFY_API_KEY: ${GRAPHIFY_API_KEY:-}
+    entrypoint: ["graphify-mcp"]
+    command: ["/workspace/graphify-out/graph.json", "--transport", "http", "--host", "0.0.0.0", "--port", "8080"]
+    volumes:
+      # Grafo(s): monta la raiz del repo (o un dir con varios proyectos) read-only:
+      # el servidor lee <montura>/<project_path>/graphify-out/graph.json.
+      - ${GRAPHIFY_WORKSPACE:-..}/:/workspace:ro
+    healthcheck:
+      # urlopen lanza HTTPError en 4xx: se captura y cuenta como sano (el MCP
+      # responde; 4xx = pide sesion/protocolo/auth). Solo 5xx o caida = malo.
+      test: ["CMD", "python", "-c", "import urllib.request,urllib.error,os,sys\ntry:\n r=urllib.request.urlopen(urllib.request.Request('http://localhost:8080/mcp',headers={'X-API-Key':os.environ.get('GRAPHIFY_API_KEY','')}),timeout=5); sys.exit(0 if r.status<500 else 1)\nexcept urllib.error.HTTPError as e:\n sys.exit(0 if e.code<500 else 1)\nexcept Exception:\n sys.exit(1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  graphify-build:
+    profiles: ["build"]
+    image: ${GRAPHIFY_IMAGE:-graphify-local:0.9.102}
+    pull_policy: missing
+    working_dir: /workspace
+    environment:
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      GRAPHIFY_BACKEND: ${GRAPHIFY_BACKEND:-openai}
+      # Cap de salida del LLM semantico (override oficial de graphify): con modelos
+      # que omiten archivos al cortarse a mitad de JSON, subir el cap reduce los
+      # resultados huecos (bug upstream #1365: caps muertos / cortos).
+      GRAPHIFY_MAX_OUTPUT_TOKENS: ${GRAPHIFY_MAX_OUTPUT_TOKENS:-}
+      # Profundidad maxima de la biseccion adaptativa (override oficial, #2880): el
+      # default 3 deja chunks de 2 archivos sin poder partirse en chunks de 1;
+      # subirlo a 4 permite ese ultimo paso y ademas reintentar respuestas hollow.
+      GRAPHIFY_MAX_RETRY_DEPTH: ${GRAPHIFY_MAX_RETRY_DEPTH:-}
+    # Build completo del grafo (extrae del workspace montado = raiz del repo).
+    entrypoint: ["graphify"]
+    command: ["extract", "/workspace", "--backend", "${GRAPHIFY_BACKEND:-openai}"]
+    volumes:
+      - ${GRAPHIFY_WORKSPACE:-..}/:/workspace:rw
+
+  graphify-update:
+    profiles: ["update"]
+    image: ${GRAPHIFY_IMAGE:-graphify-local:0.9.102}
+    pull_policy: missing
+    working_dir: /workspace
+    # Update incremental (codigo, sin LLM); usa el .graphify_root guardado por extract.
+    entrypoint: ["graphify"]
+    command: ["update"]
+    volumes:
+      - ${GRAPHIFY_WORKSPACE:-..}/:/workspace:rw
+
+  memgraph:
+    image: memgraph/memgraph:3.14.0
+    restart: unless-stopped
+    ports:
+      - "${MEMGRAPH_BOLT_PORT:-7687}:7687"
+    volumes:
+      - memgraph-data:/var/lib/memgraph
+    command: ["--telemetry-enabled=False"]
+
+  mcp-memgraph:
+    image: memgraph/mcp-memgraph:0.4.1
+    restart: unless-stopped
+    ports:
+      - "${MEMGRAPH_HTTP_PORT:-8000}:8000"
+    environment:
+      # mcp-memgraph (memgraph-toolbox) lee MEMGRAPH_URL, no MEMGRAPH_URI; el
+      # default de la imagen es host.docker.internal:7687, que apuntaria fuera
+      # del stack (o a otro memgraph del host).
+      MEMGRAPH_URL: bolt://memgraph:7687
+      MCP_TRANSPORT: streamable-http
+      MCP_READ_ONLY: "true"
+    depends_on:
+      - memgraph
+
+volumes:
+  memgraph-data:
