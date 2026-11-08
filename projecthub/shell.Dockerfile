@@ -26,4 +26,12 @@ COPY --from=build /build/shell/dist/shell/browser /usr/share/nginx/html
 # Docker demo manifest (URLs 440x, DEC-001) replaces the dev one (430x).
 COPY deploy/projecthub/manifest/federation.manifest.json /usr/share/nginx/html/federation.manifest.json
 COPY deploy/projecthub/nginx/shell.conf /etc/nginx/conf.d/default.conf
-EXPOSE 80
+COPY deploy/projecthub/nginx/headers.conf /etc/nginx/conf.d/headers.conf
+COPY deploy/projecthub/nginx/nginx.conf /etc/nginx/nginx.conf
+EXPOSE 8080
+
+# Hardening (iteracion 50): el proceso corre como usuario sin privilegios
+# (nginx uid 101). El nginx.conf propio no declara user y envia logs a los
+# std streams; pid y temp paths viven bajo /tmp (tmpfs del compose).
+RUN chmod -R a+rX /usr/share/nginx/html /etc/nginx/conf.d /etc/nginx/nginx.conf
+USER nginx

@@ -27,6 +27,14 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+    # Hardening (iteracion 50): filesystem de solo lectura y limits basicos.
+    # postgres:alpine necesita escribir en /var/run/postgresql y /tmp.
+    tmpfs:
+      - /var/run/postgresql
+      - /tmp
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
 
   api:
     build:
@@ -41,14 +49,28 @@ services:
       db:
         condition: service_healthy
     restart: unless-stopped
+    # Hardening (iteracion 50).
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
 
   shell:
     build:
       context: ../..
       dockerfile: deploy/projecthub/shell.Dockerfile
     ports:
-      - "4400:80"
+      - "4400:8080"
     restart: unless-stopped
+    # Hardening (iteracion 50): nginx corre como usuario no root en la
+    # imagen; contenedor sin escritura en disco raiz.
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /var/cache/nginx
+    security_opt:
+      - no-new-privileges:true
 
   mfe-projects:
     build:
@@ -57,8 +79,15 @@ services:
       args:
         ARG_REPO: mfe-projects
     ports:
-      - "4401:80"
+      - "4401:8080"
     restart: unless-stopped
+    # Hardening (iteracion 50).
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /var/cache/nginx
+    security_opt:
+      - no-new-privileges:true
 
   mfe-reports:
     build:
@@ -67,8 +96,15 @@ services:
       args:
         ARG_REPO: mfe-reports
     ports:
-      - "4402:80"
+      - "4402:8080"
     restart: unless-stopped
+    # Hardening (iteracion 50).
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /var/cache/nginx
+    security_opt:
+      - no-new-privileges:true
 
   mfe-admin:
     build:
@@ -77,8 +113,15 @@ services:
       args:
         ARG_REPO: mfe-admin
     ports:
-      - "4403:80"
+      - "4403:8080"
     restart: unless-stopped
+    # Hardening (iteracion 50).
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /var/cache/nginx
+    security_opt:
+      - no-new-privileges:true
 
   mfe-governance:
     build:
@@ -87,8 +130,15 @@ services:
       args:
         ARG_REPO: mfe-governance
     ports:
-      - "4404:80"
+      - "4404:8080"
     restart: unless-stopped
+    # Hardening (iteracion 50).
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /var/cache/nginx
+    security_opt:
+      - no-new-privileges:true
 
 volumes:
   projecthub_pgdata_demo:

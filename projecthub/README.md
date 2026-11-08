@@ -12,6 +12,9 @@ contrato logico y 4300-4304 es el desarrollo local con npm.
   + nginx que sirve `remoteEntry.json` y chunks.
 - `api.Dockerfile`: build del backend FastAPI (uvicorn en 8100).
 - `nginx/shell.conf` y `nginx/remote.conf`: configuracion de nginx por rol.
+- `nginx/headers.conf`: cabeceras de seguridad compartidas (incluidas por cada server).
+- `nginx/nginx.conf`: configuracion principal de nginx sin privilegios (pid y
+  temp paths bajo /tmp, logs a los std streams, sin directiva `user`).
 - `docker-compose.yml`: los 5 frontends + `api` (8100) + `db` (postgres:17),
   contexto de build en la raiz del workspace.
 
@@ -33,6 +36,21 @@ Verificacion:
   fallback SPA del shell.
 - `http://localhost:8100/api/salud` responde `{"estado":"ok"}`; login demo con
   `diana@projecthub.local` / `projecthub-demo` contra `/api/auth/login`.
+
+## Hardening (iteracion 50)
+
+- Los frontends (nginx) corren como usuario no root (uid 101): escuchan en el
+  8080 del contenedor (el compose publica `440x -> 8080`); pid y temp paths
+  bajo `/tmp`; logs a stdout/stderr (`docker logs`).
+- La API corre como `appuser` (uid 10001).
+- Todos los servicios: `read_only: true` (solo escritura en tmpfs), `tmpfs`
+  para `/tmp`, `security_opt: no-new-privileges:true`.
+- Cabeceras de seguridad en shell y remotes: `X-Content-Type-Options`,
+  `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy`; `Server:` sin
+  version (`server_tokens off`).
+- Cache: `index.html` y `remoteEntry.json` con `Cache-Control: no-cache` (un
+  redeploy sirve el HTML/manifest nuevos de inmediato); assets con hash con
+  `public, max-age=3600`.
 
 ## Notas
 

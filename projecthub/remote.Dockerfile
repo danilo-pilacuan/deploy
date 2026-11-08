@@ -26,4 +26,10 @@ FROM nginx:1.27-alpine
 ARG ARG_REPO
 COPY --from=build /build/${ARG_REPO}/dist/${ARG_REPO}/browser /usr/share/nginx/html
 COPY deploy/projecthub/nginx/remote.conf /etc/nginx/conf.d/default.conf
-EXPOSE 80
+COPY deploy/projecthub/nginx/headers.conf /etc/nginx/conf.d/headers.conf
+COPY deploy/projecthub/nginx/nginx.conf /etc/nginx/nginx.conf
+EXPOSE 8080
+
+# Hardening (iteracion 50): igual que shell.Dockerfile.
+RUN chmod -R a+rX /usr/share/nginx/html /etc/nginx/conf.d /etc/nginx/nginx.conf
+USER nginx

@@ -23,4 +23,7 @@ ENV DATABASE_URL=******db:5432/projecthub \
     AUTH_SECRET=projecthub-demo-secret-cambiar-32bytes
 
 EXPOSE 8100
+# Hardening (iteracion 50): proceso como usuario sin privilegios.
+RUN useradd --system --uid 10001 --no-create-home appuser && chown -R appuser /app
+USER appuser
 CMD ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8100"]
