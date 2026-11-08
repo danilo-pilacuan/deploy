@@ -97,6 +97,14 @@ services:
     volumes:
       - memgraph-data:/var/lib/memgraph
     command: ["--telemetry-enabled=False"]
+    healthcheck:
+      # La imagen trae bash: sondea el listener Bolt con /dev/tcp (sin clientes
+      # extra; un TCP abierto es la senal minima de vida de la base).
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/localhost/7687 && exec 3<&- && exec 3>&-"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
 
   mcp-memgraph:
     image: memgraph/mcp-memgraph:0.4.1
@@ -111,7 +119,17 @@ services:
       MCP_TRANSPORT: streamable-http
       MCP_READ_ONLY: "true"
     depends_on:
-      - memgraph
+      memgraph:
+        condition: service_healthy
+    healthcheck:
+      # La imagen base es python-slim: sondea su propio listener HTTP por socket
+      # (sin curl/wget). Un servidor TCP aceptando = proceso vivo; la salud
+      # end-to-end (Bolt alcanzable) la verifica el smoke del orquestador.
+      test: ["CMD", "python", "-c", "import socket\ns=socket.create_connection(('localhost',8000),timeout=5)\ns.close()"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
 
 volumes:
   memgraph-data:
