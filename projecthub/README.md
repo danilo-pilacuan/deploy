@@ -10,8 +10,10 @@ contrato logico y 4300-4304 es el desarrollo local con npm.
 - `shell.Dockerfile`: build del host (shell) + nginx con fallback SPA.
 - `remote.Dockerfile`: build de un remote seleccionado con `--build-arg ARG_REPO=<repo>`
   + nginx que sirve `remoteEntry.json` y chunks.
+- `api.Dockerfile`: build del backend FastAPI (uvicorn en 8100).
 - `nginx/shell.conf` y `nginx/remote.conf`: configuracion de nginx por rol.
-- `docker-compose.yml`: los 5 servicios, contexto de build en la raiz del workspace.
+- `docker-compose.yml`: los 5 frontends + `api` (8100) + `db` (postgres:17),
+  contexto de build en la raiz del workspace.
 
 ## Uso
 
@@ -29,6 +31,8 @@ Verificacion:
 - `http://localhost:4401/remoteEntry.json` (y 4402-4404) responde 200.
 - F5 en una ruta profunda (`http://localhost:4400/governance`) funciona por el
   fallback SPA del shell.
+- `http://localhost:8100/api/salud` responde `{"estado":"ok"}`; login demo con
+  `diana@projecthub.local` / `projecthub-demo` contra `/api/auth/login`.
 
 ## Notas
 
@@ -36,4 +40,14 @@ Verificacion:
   (desarrollo). Para la demo en Docker, `shell.Dockerfile` sobrescribe ese
   archivo en la imagen con `manifest/federation.manifest.json` (URLs 440x).
   Las URLs viven solo en manifests/env, nunca en literales de codigo.
+- Los frontends llaman a la API en `http://localhost:8100` (default de
+  `API_BASE_URL` en shared-lib); el mapeo `8100:8100` del servicio `api` basta,
+  sin proxy en nginx.
+- La db demo publica en el host 5434 (el 5433 pertenece a la db de desarrollo
+  del compose del backend); la API la alcanza internamente como `db:5432`.
+  El volumen `projecthub_pgdata_demo` persiste los datos de la demo entre
+  reinicios del stack.
+- `DATABASE_URL` y `AUTH_SECRET` (api) aceptan override por entorno antes de
+  los defaults del compose; el default de AUTH_SECRET cumple los 32 bytes
+  minimos de HMAC-SHA256 (RFC 7518).
 - `deploy/graphify/` es infraestructura ajena a la app: no tocar.
