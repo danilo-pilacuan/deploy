@@ -51,6 +51,9 @@ Verificacion:
   los defaults del compose; el default de AUTH_SECRET cumple los 32 bytes
   minimos de HMAC-SHA256 (RFC 7518).
 - `deploy/graphify/` es infraestructura ajena a la app: no tocar.
+- E2E del banner de API: `node tools/e2e/e2e-banner-api.mjs` desde la raiz del
+  workspace (requiere la demo arriba en 4400 y docker para detener/arrancar el
+  contenedor de la API; 8 comprobaciones).
 - Tras un `docker compose build` de los frontends hay que forzar recarga sin
   cache en el navegador (Ctrl+F5 o vaciar cache HTTP): es-module-shims queda con
   el importmap y los chunks en memoria y puede resolver chunks viejos,
