@@ -51,3 +51,11 @@ Verificacion:
   los defaults del compose; el default de AUTH_SECRET cumple los 32 bytes
   minimos de HMAC-SHA256 (RFC 7518).
 - `deploy/graphify/` es infraestructura ajena a la app: no tocar.
+- Tras un `docker compose build` de los frontends hay que forzar recarga sin
+  cache en el navegador (Ctrl+F5 o vaciar cache HTTP): es-module-shims queda con
+  el importmap y los chunks en memoria y puede resolver chunks viejos,
+  produciendo errores tipo `... is not a function` por singleton desactualizado
+  (`@projecthub/shared` aunque el `remoteEntry.json` servido ya apunte al nuevo).
+- El shell expone el banner de estado de API (item 11.6 de
+  `docs/funcionalidades.md`): con la API caida aparece un aviso de modo demo en
+  ~5 s y desaparece solo cuando `/api/salud` vuelve a responder 200.
