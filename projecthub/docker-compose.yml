@@ -1,8 +1,10 @@
 # ProjectHub demo stack (DEC-002): shell + 4 remotes + API + db behind nginx.
 # Ports 4400-4404 per DEC-001 (4200-4204 occupied on host; 4300-4304 = local dev).
-# API on 8100 (reserved for it per DEC-001) and db on 5433 (DEC-006). The API
-# builds with DATABASE_URL pointing at the `db` service; the frontends keep
-# API_BASE_URL default http://localhost:8100, so the host port must stay 8100.
+# API on 8100 (reserved for it per DEC-001) and db on 5433 (DEC-006). The API is
+# the Go backend (backend-go submodule); the Python backend (backend/) is
+# deprecated. It builds with DATABASE_URL pointing at the `db` service; the
+# frontends keep API_BASE_URL default http://localhost:8100, so the host port
+# must stay 8100.
 # Build context is the workspace root: docker compose -f deploy/projecthub/docker-compose.yml up --build
 name: projecthub
 
@@ -39,7 +41,7 @@ services:
   api:
     build:
       context: ../..
-      dockerfile: deploy/projecthub/api.Dockerfile
+      dockerfile: deploy/projecthub/api-go.Dockerfile
     ports:
       - "8100:8100"
     environment:
